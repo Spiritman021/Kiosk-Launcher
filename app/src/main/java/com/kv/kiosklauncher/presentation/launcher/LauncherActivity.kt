@@ -2,6 +2,7 @@ package com.kv.kiosklauncher.presentation.launcher
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,6 +46,12 @@ class LauncherActivity : ComponentActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Apply kiosk mode window flags BEFORE setting content
+        window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
         enableEdgeToEdge()
         
         setContent {
@@ -65,9 +72,23 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         
-        // Apply kiosk mode settings
+        // Apply kiosk mode settings every time we resume
         lifecycleScope.launch {
             applyKioskModeSettings()
+        }
+    }
+    
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        
+        // Reapply system UI hiding when window regains focus
+        if (hasFocus) {
+            lifecycleScope.launch {
+                val config = configurationRepository.configuration.first()
+                if (config.isKioskModeEnabled) {
+                    systemUIManager.hideSystemUI(window)
+                }
+            }
         }
     }
     
@@ -122,6 +143,8 @@ class LauncherActivity : ComponentActivity() {
         val config = configurationRepository.configuration.first()
         
         if (!config.isKioskModeEnabled) {
+            // Remove kiosk restrictions if disabled
+            systemUIManager.removeKioskMode(window)
             return
         }
         
@@ -129,11 +152,16 @@ class LauncherActivity : ComponentActivity() {
         if (config.useLockTaskMode && lockTaskManager.isLockTaskModeSupported()) {
             if (lockTaskManager.isDeviceOwner()) {
                 lockTaskManager.startLockTask(this)
+                // Lock Task Mode handles status bar blocking
+                systemUIManager.hideSystemUI(window)
+                systemUIManager.keepScreenOn(window)
+            } else {
+                // No device owner - use aggressive fallback
+                systemUIManager.applyFullKioskMode(window, this)
             }
         } else {
-            // Fallback to system UI hiding for legacy devices
-            systemUIManager.hideSystemUI(window)
-            systemUIManager.disableStatusBarExpansion(window)
+            // Fallback to aggressive system UI hiding
+            systemUIManager.applyFullKioskMode(window, this)
         }
     }
     
@@ -142,5 +170,8 @@ class LauncherActivity : ComponentActivity() {
         
         // Stop monitoring when activity is destroyed
         appLaunchMonitor.stopMonitoring()
+        
+        // Remove status bar blocker
+        systemUIManager.removeStatusBarBlocker()
     }
 }
