@@ -73,22 +73,8 @@ class LauncherActivity : ComponentActivity() {
     
     override fun onPause() {
         super.onPause()
-        
-        // Keep kiosk mode active even when paused
-        lifecycleScope.launch {
-            val config = configurationRepository.configuration.first()
-            if (config.isKioskModeEnabled) {
-                // Bring launcher back to front after a short delay
-                window.decorView.postDelayed({
-                    if (!isFinishing) {
-                        val intent = Intent(this@LauncherActivity, LauncherActivity::class.java)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        startActivity(intent)
-                    }
-                }, 100)
-            }
-        }
+        // Don't force launcher to front - let accessibility service and app monitor handle blocking
+        // This allows AdminSettingsActivity and whitelisted apps to work properly
     }
     
     @Deprecated("Deprecated in Java")

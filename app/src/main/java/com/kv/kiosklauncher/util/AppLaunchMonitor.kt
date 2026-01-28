@@ -71,7 +71,7 @@ class AppLaunchMonitor @Inject constructor(
             launch {
                 while (isActive) {
                     checkForegroundApp()
-                    delay(500) // Check every 500ms
+                    delay(1000) // Check every 1 second (reduced from 500ms to be less aggressive)
                 }
             }
         }
