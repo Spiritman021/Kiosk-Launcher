@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Kiosk Launcher</string>
+    <string name="accessibility_service_description">Monitors app launches to enforce kiosk mode restrictions. This service blocks non-whitelisted apps and ensures only approved applications can run.</string>
+</resources>
