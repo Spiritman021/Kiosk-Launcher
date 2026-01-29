@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.kv.kiosklauncher.R
 import com.kv.kiosklauncher.data.repository.ConfigurationRepository
@@ -47,6 +48,7 @@ class KioskService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     
     companion object {
+        private const val TAG = "KioskService"
         private const val NOTIFICATION_ID = 1001
         private const val CHANNEL_ID = "kiosk_service_channel"
         private const val CHANNEL_NAME = "Kiosk Service"
@@ -61,18 +63,23 @@ class KioskService : Service() {
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         serviceScope.launch {
-            monitorKioskMode()
-        }
-        
-        serviceScope.launch {
-            enforceKioskMode()
-        }
-        
-        // Start status bar blocker service
-        serviceScope.launch {
             val config = configurationRepository.configuration.first()
             if (config.isKioskModeEnabled) {
+                // Start continuous monitoring service (50ms polling)
+                val monitorIntent = Intent(this@KioskService, ContinuousMonitorService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(monitorIntent)
+                } else {
+                    startService(monitorIntent)
+                }
+                
+                // Start blocker overlay service
+                BlockerOverlayService.start(this@KioskService)
+                
+                // Start status bar blocker service
                 StatusBarBlockerService.start(this@KioskService)
+                
+                Log.d(TAG, "Started all kiosk enforcement services")
             }
         }
         
@@ -85,8 +92,12 @@ class KioskService : Service() {
         super.onDestroy()
         serviceScope.cancel()
         
-        // Stop status bar blocker service
+        // Stop all kiosk enforcement services
+        stopService(Intent(this, ContinuousMonitorService::class.java))
+        BlockerOverlayService.stop(this)
         StatusBarBlockerService.stop(this)
+        
+        Log.d(TAG, "Stopped all kiosk enforcement services")
     }
     
     /**

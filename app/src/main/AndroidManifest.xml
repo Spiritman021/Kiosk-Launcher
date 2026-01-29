@@ -114,6 +114,28 @@
                 android:value="kiosk_mode" />
         </service>
         
+        <!-- Continuous Monitor Service (50ms polling) -->
+        <service
+            android:name=".service.ContinuousMonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="kiosk_mode" />
+        </service>
+        
+        <!-- Blocker Overlay Service (instant visual blocking) -->
+        <service
+            android:name=".service.BlockerOverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="kiosk_mode" />
+        </service>
+        
         <!-- Status Bar Blocker Service (System-wide overlay) -->
         <service
             android:name=".service.StatusBarBlockerService"

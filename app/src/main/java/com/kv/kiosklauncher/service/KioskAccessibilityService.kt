@@ -7,7 +7,6 @@ import android.view.accessibility.AccessibilityEvent
 import com.kv.kiosklauncher.data.repository.ConfigurationRepository
 import com.kv.kiosklauncher.data.repository.WhitelistRepository
 import com.kv.kiosklauncher.presentation.launcher.LauncherActivity
-import com.kv.kiosklauncher.util.ScreenManager
 import com.kv.kiosklauncher.util.TaskKiller
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -30,9 +29,6 @@ class KioskAccessibilityService : AccessibilityService() {
     
     @Inject
     lateinit var whitelistRepository: WhitelistRepository
-    
-    @Inject
-    lateinit var screenManager: ScreenManager
     
     @Inject
     lateinit var taskKiller: TaskKiller
@@ -137,36 +133,21 @@ class KioskAccessibilityService : AccessibilityService() {
     
     /**
      * Block current app and return to launcher
-     * Uses multiple aggressive methods for instant blocking
+     * Uses overlay blocker for instant visual blocking
      */
     private fun blockApp(packageName: String) {
-        Log.d(TAG, "Initiating aggressive block for: $packageName")
+        Log.d(TAG, "Initiating block for: $packageName")
         
-        // METHOD 1: Turn screen off (most effective - like BlockIt)
-        if (screenManager.turnScreenOff()) {
-            Log.d(TAG, "✓ Screen turned off for blocked app: $packageName")
-            // Also kill the task so it doesn't resume when screen turns back on
-            taskKiller.aggressiveKill(packageName)
-            return
-        }
+        // METHOD 1: Show overlay blocker (instant visual blocking - no flash)
+        BlockerOverlayService.blockApp(this, packageName)
         
         // METHOD 2: Aggressive task killing
-        Log.d(TAG, "Screen-off unavailable, using task killer")
         taskKiller.aggressiveKill(packageName)
         
         // METHOD 3: Multiple global actions to force exit
         performGlobalAction(GLOBAL_ACTION_HOME)
         performGlobalAction(GLOBAL_ACTION_BACK)
-        performGlobalAction(GLOBAL_ACTION_BACK)
         
-        // METHOD 4: Launch launcher activity
-        val intent = Intent(this, LauncherActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        startActivity(intent)
-        
-        Log.d(TAG, "✓ Blocked app using fallback methods: $packageName")
+        Log.d(TAG, "✓ Blocked app: $packageName")
     }
 }
