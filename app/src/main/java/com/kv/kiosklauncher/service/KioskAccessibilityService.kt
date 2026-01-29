@@ -7,6 +7,8 @@ import android.view.accessibility.AccessibilityEvent
 import com.kv.kiosklauncher.data.repository.ConfigurationRepository
 import com.kv.kiosklauncher.data.repository.WhitelistRepository
 import com.kv.kiosklauncher.presentation.launcher.LauncherActivity
+import com.kv.kiosklauncher.util.ScreenManager
+import com.kv.kiosklauncher.util.TaskKiller
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,12 +31,28 @@ class KioskAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var whitelistRepository: WhitelistRepository
     
+    @Inject
+    lateinit var screenManager: ScreenManager
+    
+    @Inject
+    lateinit var taskKiller: TaskKiller
+    
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var whitelistedPackages: Set<String> = emptySet()
     private var isKioskModeEnabled = false
     
     companion object {
         private const val TAG = "KioskAccessibility"
+        
+        // System phone/dialer packages that should always be allowed for emergency calls
+        private val SYSTEM_PHONE_PACKAGES = setOf(
+            "com.android.phone",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.samsung.android.dialer",
+            "com.android.incallui",
+            "com.android.server.telecom"
+        )
     }
     
     override fun onServiceConnected() {
@@ -80,15 +98,21 @@ class KioskAccessibilityService : AccessibilityService() {
                 return
             }
             
+            // ALWAYS allow phone/dialer apps for emergency calls
+            if (isPhoneOrDialer(packageName)) {
+                Log.d(TAG, "Allowing phone/dialer app: $packageName")
+                return
+            }
+            
             // Check if app is whitelisted
             if (whitelistedPackages.contains(packageName)) {
                 Log.d(TAG, "Allowing whitelisted app: $packageName")
                 return
             }
             
-            // Block non-whitelisted app
+            // Block non-whitelisted app with aggressive methods
             Log.w(TAG, "BLOCKING non-whitelisted app: $packageName")
-            blockApp()
+            blockApp(packageName)
         }
     }
     
@@ -102,9 +126,40 @@ class KioskAccessibilityService : AccessibilityService() {
     }
     
     /**
-     * Block current app and return to launcher
+     * Check if package is a phone or dialer app (for emergency calls)
      */
-    private fun blockApp() {
+    private fun isPhoneOrDialer(packageName: String): Boolean {
+        return SYSTEM_PHONE_PACKAGES.contains(packageName) ||
+               packageName.contains("dialer", ignoreCase = true) ||
+               packageName.contains("phone", ignoreCase = true) ||
+               packageName.contains("call", ignoreCase = true)
+    }
+    
+    /**
+     * Block current app and return to launcher
+     * Uses multiple aggressive methods for instant blocking
+     */
+    private fun blockApp(packageName: String) {
+        Log.d(TAG, "Initiating aggressive block for: $packageName")
+        
+        // METHOD 1: Turn screen off (most effective - like BlockIt)
+        if (screenManager.turnScreenOff()) {
+            Log.d(TAG, "✓ Screen turned off for blocked app: $packageName")
+            // Also kill the task so it doesn't resume when screen turns back on
+            taskKiller.aggressiveKill(packageName)
+            return
+        }
+        
+        // METHOD 2: Aggressive task killing
+        Log.d(TAG, "Screen-off unavailable, using task killer")
+        taskKiller.aggressiveKill(packageName)
+        
+        // METHOD 3: Multiple global actions to force exit
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        
+        // METHOD 4: Launch launcher activity
         val intent = Intent(this, LauncherActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -112,7 +167,6 @@ class KioskAccessibilityService : AccessibilityService() {
         }
         startActivity(intent)
         
-        // Perform global back action to close the non-whitelisted app
-        performGlobalAction(GLOBAL_ACTION_BACK)
+        Log.d(TAG, "✓ Blocked app using fallback methods: $packageName")
     }
 }

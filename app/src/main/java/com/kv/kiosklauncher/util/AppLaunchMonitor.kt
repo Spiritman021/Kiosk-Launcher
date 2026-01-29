@@ -22,7 +22,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class AppLaunchMonitor @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val screenManager: ScreenManager,
+    private val taskKiller: TaskKiller
 ) {
     
     private var monitoringScope: CoroutineScope? = null
@@ -30,6 +32,16 @@ class AppLaunchMonitor @Inject constructor(
     
     companion object {
         private const val TAG = "AppLaunchMonitor"
+        
+        // System phone/dialer packages that should always be allowed for emergency calls
+        private val SYSTEM_PHONE_PACKAGES = setOf(
+            "com.android.phone",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.samsung.android.dialer",
+            "com.android.incallui",
+            "com.android.server.telecom"
+        )
     }
     
     /**
@@ -71,7 +83,7 @@ class AppLaunchMonitor @Inject constructor(
             launch {
                 while (isActive) {
                     checkForegroundApp()
-                    delay(1000) // Check every 1 second (reduced from 500ms to be less aggressive)
+                    delay(250) // Check every 250ms for instant blocking (reduced from 1000ms)
                 }
             }
         }
@@ -106,15 +118,55 @@ class AppLaunchMonitor @Inject constructor(
             return
         }
         
+        // ALWAYS allow phone/dialer apps for emergency calls
+        if (isPhoneOrDialer(foregroundPackage)) {
+            Log.d(TAG, "Allowing phone/dialer app: $foregroundPackage")
+            return
+        }
+        
         // Check if app is whitelisted
         if (whitelistedPackages.contains(foregroundPackage)) {
             Log.d(TAG, "Allowing whitelisted app: $foregroundPackage")
             return
         }
         
-        // If not whitelisted, bring launcher to front
+        // If not whitelisted, block with aggressive methods
         Log.w(TAG, "BLOCKING non-whitelisted app: $foregroundPackage")
+        blockApp(foregroundPackage)
+    }
+    
+    /**
+     * Check if package is a phone or dialer app (for emergency calls)
+     */
+    private fun isPhoneOrDialer(packageName: String): Boolean {
+        return SYSTEM_PHONE_PACKAGES.contains(packageName) ||
+               packageName.contains("dialer", ignoreCase = true) ||
+               packageName.contains("phone", ignoreCase = true) ||
+               packageName.contains("call", ignoreCase = true)
+    }
+    
+    /**
+     * Block app with aggressive methods (screen-off, task kill, launcher redirect)
+     */
+    private fun blockApp(packageName: String) {
+        Log.d(TAG, "Initiating aggressive block for: $packageName")
+        
+        // METHOD 1: Turn screen off (most effective - like BlockIt)
+        if (screenManager.turnScreenOff()) {
+            Log.d(TAG, "✓ Screen turned off for blocked app: $packageName")
+            // Also kill the task so it doesn't resume when screen turns back on
+            taskKiller.aggressiveKill(packageName)
+            return
+        }
+        
+        // METHOD 2: Aggressive task killing
+        Log.d(TAG, "Screen-off unavailable, using task killer")
+        taskKiller.aggressiveKill(packageName)
+        
+        // METHOD 3: Bring launcher to front
         bringLauncherToFront()
+        
+        Log.d(TAG, "✓ Blocked app using fallback methods: $packageName")
     }
     
     /**
