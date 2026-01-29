@@ -68,6 +68,14 @@ class KioskService : Service() {
             enforceKioskMode()
         }
         
+        // Start status bar blocker service
+        serviceScope.launch {
+            val config = configurationRepository.configuration.first()
+            if (config.isKioskModeEnabled) {
+                StatusBarBlockerService.start(this@KioskService)
+            }
+        }
+        
         return START_STICKY
     }
     
@@ -76,6 +84,9 @@ class KioskService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+        
+        // Stop status bar blocker service
+        StatusBarBlockerService.stop(this)
     }
     
     /**

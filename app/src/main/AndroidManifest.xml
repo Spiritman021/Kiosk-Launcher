@@ -114,6 +114,17 @@
                 android:value="kiosk_mode" />
         </service>
         
+        <!-- Status Bar Blocker Service (System-wide overlay) -->
+        <service
+            android:name=".service.StatusBarBlockerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="kiosk_mode" />
+        </service>
+        
         <!-- Accessibility Service for robust monitoring -->
         <service
             android:name=".service.KioskAccessibilityService"

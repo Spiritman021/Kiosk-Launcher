@@ -6,6 +6,7 @@ import com.kv.kiosklauncher.data.model.AppInfo
 import com.kv.kiosklauncher.data.model.KioskConfiguration
 import com.kv.kiosklauncher.data.repository.ConfigurationRepository
 import com.kv.kiosklauncher.data.repository.WhitelistRepository
+import com.kv.kiosklauncher.service.StatusBarBlockerService
 import com.kv.kiosklauncher.util.AppManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,11 +32,14 @@ class LauncherViewModel @Inject constructor(
     private val _configuration = MutableStateFlow(KioskConfiguration())
     val configuration: StateFlow<KioskConfiguration> = _configuration.asStateFlow()
     
+
+    private val TAG = "LauncherViewModel"
+
     init {
         loadWhitelistedApps()
         loadConfiguration()
     }
-    
+
     /**
      * Load whitelisted apps
      */
@@ -46,12 +50,12 @@ class LauncherViewModel @Inject constructor(
                 configurationRepository.configuration
             ) { whitelistEntries, config ->
                 _configuration.value = config
-                
+
                 // Get full app info for whitelisted apps
                 val apps = whitelistEntries.mapNotNull { entry ->
                     appManager.getAppInfo(entry.packageName)
                 }
-                
+
                 if (apps.isEmpty()) {
                     LauncherUiState.Empty
                 } else {

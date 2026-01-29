@@ -156,12 +156,18 @@ class LauncherActivity : ComponentActivity() {
                 systemUIManager.hideSystemUI(window)
                 systemUIManager.keepScreenOn(window)
             } else {
-                // No device owner - use aggressive fallback
-                systemUIManager.applyFullKioskMode(window, this)
+                // No device owner - use system UI hiding only
+                // StatusBarBlockerService handles the overlay
+                systemUIManager.hideSystemUI(window)
+                systemUIManager.disableStatusBarExpansion(window)
+                systemUIManager.keepScreenOn(window)
             }
         } else {
-            // Fallback to aggressive system UI hiding
-            systemUIManager.applyFullKioskMode(window, this)
+            // Fallback to system UI hiding
+            // StatusBarBlockerService handles the overlay
+            systemUIManager.hideSystemUI(window)
+            systemUIManager.disableStatusBarExpansion(window)
+            systemUIManager.keepScreenOn(window)
         }
     }
     
@@ -171,7 +177,6 @@ class LauncherActivity : ComponentActivity() {
         // Stop monitoring when activity is destroyed
         appLaunchMonitor.stopMonitoring()
         
-        // Remove status bar blocker
-        systemUIManager.removeStatusBarBlocker()
+        // StatusBarBlockerService handles overlay cleanup
     }
 }
