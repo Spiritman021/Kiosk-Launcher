@@ -41,13 +41,13 @@ class SettingsRepository @Inject constructor(
      */
     private suspend fun createDefaultSettings(): KioskSettings {
         val defaultSettings = KioskSettings(
-            blockingMode = BlockingMode.BOTH,
-            enableScreenOff = true,
+            blockingMode = BlockingMode.REDIRECT, // Changed from BOTH to REDIRECT for reliability
+            enableScreenOff = false, // Disabled screen-off for now
             autoWhitelistDialer = true,
             monitoringIntervalMs = 100,
             showNotificationDuringSession = true,
-            vibrateOnBlock = true,
-            showBlockOverlay = true,
+            vibrateOnBlock = false, // Disabled vibration for now
+            showBlockOverlay = false, // Disabled overlay for now
             screenOffRedirectDelayMs = 500
         )
         kioskSettingsDao.insertSettings(defaultSettings)

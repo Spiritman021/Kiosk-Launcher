@@ -72,15 +72,25 @@ class AppMonitorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     
     private fun startMonitoring() {
-        Log.d(TAG, "Starting app monitoring")
+        Log.d(TAG, "🚀 Starting app monitoring")
+        Log.d(TAG, "Session active: ${sessionManager.isSessionActive.value}")
+        Log.d(TAG, "Whitelist count: ${whitelistChecker.getWhitelistCount()}")
+        
+        // Refresh whitelist cache to ensure it's loaded
+        serviceScope.launch {
+            whitelistChecker.refreshCache()
+            Log.d(TAG, "Whitelist cache refreshed. Count: ${whitelistChecker.getWhitelistCount()}")
+        }
         
         // Start foreground service
         val notification = createNotification()
         startForeground(NOTIFICATION_ID, notification)
+        Log.d(TAG, "Foreground service started with notification")
         
         // Start monitoring loop
         monitoringJob?.cancel()
         monitoringJob = serviceScope.launch {
+            Log.d(TAG, "Monitoring loop started - polling every ${MONITORING_INTERVAL_MS}ms")
             while (isActive) {
                 try {
                     checkForegroundApp()
