@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kv.kiosklauncher.data.dao.WhitelistedAppDao
+import com.kv.kiosklauncher.data.repository.WhitelistRepository
 import com.kv.kiosklauncher.service.SessionManager
 import com.kv.kiosklauncher.util.PermissionHelper
 import com.kv.kiosklauncher.util.WhitelistChecker
@@ -21,7 +22,8 @@ class TimerViewModel @Inject constructor(
     application: Application,
     private val sessionManager: SessionManager,
     private val whitelistedAppDao: WhitelistedAppDao,
-    private val whitelistChecker: WhitelistChecker
+    private val whitelistChecker: WhitelistChecker,
+    private val whitelistRepository: WhitelistRepository
 ) : AndroidViewModel(application) {
     
     private val permissionHelper = PermissionHelper(application)
@@ -37,11 +39,25 @@ class TimerViewModel @Inject constructor(
     
     init {
         checkPermissions()
+        initializeWhitelist()
+    }
+    
+    /**
+     * Initialize whitelist with phone app on first launch
+     */
+    private fun initializeWhitelist() {
+        viewModelScope.launch {
+            // Auto-whitelist phone app for emergency calls
+            whitelistRepository.autoWhitelistPhoneApp()
+            
+            // Refresh cache
+            whitelistChecker.refreshCache()
+        }
     }
     
     fun startIndefiniteSession() {
         viewModelScope.launch {
-            // Refresh whitelist cache
+            // Refresh whitelist cache before starting
             whitelistChecker.refreshCache()
             
             // Start indefinite session
@@ -51,7 +67,7 @@ class TimerViewModel @Inject constructor(
     
     fun startSession(durationMinutes: Int) {
         viewModelScope.launch {
-            // Refresh whitelist cache
+            // Refresh whitelist cache before starting
             whitelistChecker.refreshCache()
             
             // Start session

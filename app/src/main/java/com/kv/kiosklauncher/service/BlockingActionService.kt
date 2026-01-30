@@ -57,9 +57,13 @@ class BlockingActionService @Inject constructor(
      * Execute blocking action for the given package
      */
     suspend fun blockApp(packageName: String) {
+        android.util.Log.d("BlockingAction", "🚫 blockApp() called for: $packageName")
+        
         val settings = kioskSettingsDao.getSettings()
         val appName = appDetector.getAppName(packageName)
         val currentSession = sessionManager.currentSession.value
+        
+        android.util.Log.d("BlockingAction", "Settings: ${settings?.blockingMode}, Session: ${currentSession?.id}")
         
         // Log the block event
         if (currentSession != null) {
@@ -70,22 +74,30 @@ class BlockingActionService @Inject constructor(
                 actionTaken = settings?.blockingMode?.name ?: BlockingMode.BOTH.name
             )
             blockLogDao.insertBlockLog(blockLog)
+            android.util.Log.d("BlockingAction", "Block event logged to database")
         }
         
         // Vibrate if enabled
         if (settings?.vibrateOnBlock == true) {
             vibrateShort()
+            android.util.Log.d("BlockingAction", "Vibration triggered")
         }
         
         // Execute blocking action based on mode
-        when (settings?.blockingMode ?: BlockingMode.BOTH) {
+        val blockingMode = settings?.blockingMode ?: BlockingMode.BOTH
+        android.util.Log.d("BlockingAction", "Executing blocking mode: $blockingMode")
+        
+        when (blockingMode) {
             BlockingMode.REDIRECT -> {
+                android.util.Log.d("BlockingAction", "Mode: REDIRECT - Redirecting to launcher")
                 redirectToLauncher()
             }
             BlockingMode.SCREEN_OFF -> {
+                android.util.Log.d("BlockingAction", "Mode: SCREEN_OFF - Locking screen")
                 lockScreen()
             }
             BlockingMode.BOTH -> {
+                android.util.Log.d("BlockingAction", "Mode: BOTH - Locking screen then redirecting")
                 lockScreen()
                 // Wait a bit then redirect
                 CoroutineScope(Dispatchers.Main).launch {
@@ -116,15 +128,25 @@ class BlockingActionService @Inject constructor(
      */
     private fun redirectToLauncher() {
         try {
+            android.util.Log.d("BlockingAction", "Attempting to redirect to launcher...")
             val launcherIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            launcherIntent?.apply {
+            
+            if (launcherIntent == null) {
+                android.util.Log.e("BlockingAction", "ERROR: Could not get launcher intent!")
+                return
+            }
+            
+            launcherIntent.apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                context.startActivity(this)
             }
+            
+            context.startActivity(launcherIntent)
+            android.util.Log.d("BlockingAction", "✓ Successfully launched launcher activity")
         } catch (e: Exception) {
+            android.util.Log.e("BlockingAction", "ERROR redirecting to launcher", e)
             e.printStackTrace()
         }
     }

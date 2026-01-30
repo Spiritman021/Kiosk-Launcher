@@ -110,36 +110,4 @@ class WhitelistRepository @Inject constructor(
             }
         }
     }
-    
-    /**
-     * Auto-whitelist the kiosk launcher itself
-     * CRITICAL: This must be called on app initialization
-     */
-    suspend fun autoWhitelistKioskLauncher() {
-        try {
-            val packageName = context.packageName
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            val appName = packageManager.getApplicationLabel(appInfo).toString()
-            
-            val whitelistedApp = WhitelistedApp(
-                packageName = packageName,
-                appName = appName,
-                isSystemApp = false,
-                isAutoWhitelisted = true
-            )
-            whitelistedAppDao.insertWhitelistedApp(whitelistedApp)
-        } catch (e: Exception) {
-            // Should never happen, but log if it does
-            e.printStackTrace()
-        }
-    }
-    
-    /**
-     * Initialize default whitelist (kiosk launcher + phone app)
-     * Should be called on first app launch
-     */
-    suspend fun initializeDefaultWhitelist() {
-        autoWhitelistKioskLauncher()
-        autoWhitelistPhoneApp()
-    }
 }

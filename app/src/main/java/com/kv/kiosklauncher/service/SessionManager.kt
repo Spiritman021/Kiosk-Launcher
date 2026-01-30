@@ -2,7 +2,6 @@ package com.kv.kiosklauncher.service
 
 import com.kv.kiosklauncher.data.dao.SessionDao
 import com.kv.kiosklauncher.data.model.Session
-import com.kv.kiosklauncher.util.WhitelistChecker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +15,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class SessionManager @Inject constructor(
-    private val sessionDao: SessionDao,
-    private val whitelistChecker: WhitelistChecker
+    private val sessionDao: SessionDao
 ) {
     
     private val _currentSession = MutableStateFlow<Session?>(null)
@@ -50,9 +48,6 @@ class SessionManager @Inject constructor(
         _currentSession.value = createdSession
         _isSessionActive.value = true
         
-        // CRITICAL: Refresh whitelist cache before monitoring starts
-        whitelistChecker.refreshCache()
-        
         return createdSession
     }
     
@@ -80,9 +75,6 @@ class SessionManager @Inject constructor(
         
         _currentSession.value = createdSession
         _isSessionActive.value = true
-        
-        // CRITICAL: Refresh whitelist cache before monitoring starts
-        whitelistChecker.refreshCache()
         
         return createdSession
     }

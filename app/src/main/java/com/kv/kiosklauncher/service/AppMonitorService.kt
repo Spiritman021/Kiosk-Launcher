@@ -109,7 +109,7 @@ class AppMonitorService : Service() {
         
         // Check if session has expired
         if (sessionManager.isSessionExpired()) {
-            Log.d(TAG, "Session expired, stopping monitoring")
+            Log.d(TAG, "Session expired, stopping")
             sessionManager.stopSession()
             stopMonitoring()
             return
@@ -118,19 +118,28 @@ class AppMonitorService : Service() {
         // Get foreground app
         val foregroundPackage = appDetector.getForegroundAppPackageName()
         
-        if (foregroundPackage != null && foregroundPackage != lastCheckedPackage) {
+        if (foregroundPackage == null) {
+            Log.v(TAG, "Could not detect foreground app")
+            return
+        }
+        
+        // Log every app change
+        if (foregroundPackage != lastCheckedPackage) {
             lastCheckedPackage = foregroundPackage
-            Log.d(TAG, "Detected app: $foregroundPackage")
+            Log.d(TAG, "Foreground app changed to: $foregroundPackage")
+            
+            // Check whitelist status
+            val isWhitelisted = whitelistChecker.isWhitelisted(foregroundPackage)
+            val shouldBlock = whitelistChecker.shouldBlock(foregroundPackage)
+            
+            Log.d(TAG, "App: $foregroundPackage | Whitelisted: $isWhitelisted | Should Block: $shouldBlock")
             
             // Check if app should be blocked
-            val shouldBlock = whitelistChecker.shouldBlock(foregroundPackage)
-            Log.d(TAG, "Should block $foregroundPackage? $shouldBlock (whitelisted: ${!shouldBlock})")
-            
             if (shouldBlock) {
-                Log.w(TAG, "🚫 BLOCKING unauthorized app: $foregroundPackage")
+                Log.w(TAG, "⚠️ BLOCKING unauthorized app: $foregroundPackage")
                 blockingActionService.blockApp(foregroundPackage)
             } else {
-                Log.d(TAG, "✅ Allowing whitelisted app: $foregroundPackage")
+                Log.d(TAG, "✓ App $foregroundPackage is allowed")
             }
         }
     }
