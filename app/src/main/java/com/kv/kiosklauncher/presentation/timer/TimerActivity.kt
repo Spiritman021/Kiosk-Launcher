@@ -17,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.kv.kiosklauncher.presentation.permissions.PermissionSetupActivity
 import com.kv.kiosklauncher.service.AppMonitorService
 import com.kv.kiosklauncher.ui.theme.KioskLauncherTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 /**
  * Activity for setting up and controlling kiosk session timer.
@@ -39,9 +41,22 @@ class TimerActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onStartSession = {
                         if (viewModel.hasAllPermissions()) {
-                            viewModel.startIndefiniteSession()
-                            startMonitoringService()
-                            finish()
+                            // Use coroutine to wait for session creation
+                            lifecycleScope.launch {
+                                val success = viewModel.startIndefiniteSession()
+                                if (success) {
+                                    // Session is now fully created and saved
+                                    startMonitoringService()
+                                    finish()
+                                } else {
+                                    // Show error toast
+                                    android.widget.Toast.makeText(
+                                        this@TimerActivity,
+                                        "Failed to start kiosk mode",
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
                         } else {
                             // Navigate to permission setup
                             startActivity(Intent(this, PermissionSetupActivity::class.java))

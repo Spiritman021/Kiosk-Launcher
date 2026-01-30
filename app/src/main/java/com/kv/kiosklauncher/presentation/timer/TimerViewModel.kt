@@ -55,13 +55,25 @@ class TimerViewModel @Inject constructor(
         }
     }
     
-    fun startIndefiniteSession() {
-        viewModelScope.launch {
+    /**
+     * Start indefinite session and return success status
+     * Suspends until session is fully created and saved
+     */
+    suspend fun startIndefiniteSession(): Boolean {
+        return try {
             // Refresh whitelist cache before starting
             whitelistChecker.refreshCache()
             
-            // Start indefinite session
+            // Start indefinite session (suspends until DB write completes)
             sessionManager.startIndefiniteSession()
+            
+            // Small delay to ensure database transaction is committed
+            kotlinx.coroutines.delay(100)
+            
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("TimerViewModel", "Failed to start session", e)
+            false
         }
     }
     
