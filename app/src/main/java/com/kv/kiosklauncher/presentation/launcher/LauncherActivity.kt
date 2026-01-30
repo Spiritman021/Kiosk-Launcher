@@ -110,12 +110,14 @@ fun LauncherScreen(
                     }
                 },
                 actions = {
+                    // Always show settings icon for admin access
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, "Settings")
+                    }
+                    // Only show timer when session is not active
                     if (!isSessionActive) {
                         IconButton(onClick = onTimerClick) {
                             Icon(Icons.Default.Timer, "Start Session")
-                        }
-                        IconButton(onClick = onSettingsClick) { // Kept onSettingsClick lambda
-                            Icon(Icons.Default.Settings, "Settings")
                         }
                     }
                 }
