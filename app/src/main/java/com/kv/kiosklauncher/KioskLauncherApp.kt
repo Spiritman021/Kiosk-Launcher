@@ -28,16 +28,14 @@ class KioskLauncherApp : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize default settings and auto-whitelist phone app
+        // CRITICAL: Initialize default whitelist on every app start
+        // This ensures kiosk launcher itself is always whitelisted
         applicationScope.launch {
             // Ensure default settings exist
             settingsRepository.getSettings()
             
-            // Auto-whitelist phone app if setting is enabled
-            val settings = settingsRepository.getSettings()
-            if (settings.autoWhitelistDialer) {
-                whitelistRepository.autoWhitelistPhoneApp()
-            }
+            // Initialize default whitelist (kiosk launcher + phone app)
+            whitelistRepository.initializeDefaultWhitelist()
         }
     }
 }

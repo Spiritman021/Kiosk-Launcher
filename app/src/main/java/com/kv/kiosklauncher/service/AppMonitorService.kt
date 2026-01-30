@@ -102,12 +102,14 @@ class AppMonitorService : Service() {
     private suspend fun checkForegroundApp() {
         // Check if session is still active
         if (!sessionManager.isSessionActive.value) {
+            Log.d(TAG, "Session not active, stopping monitoring")
             stopMonitoring()
             return
         }
         
         // Check if session has expired
         if (sessionManager.isSessionExpired()) {
+            Log.d(TAG, "Session expired, stopping monitoring")
             sessionManager.stopSession()
             stopMonitoring()
             return
@@ -118,11 +120,17 @@ class AppMonitorService : Service() {
         
         if (foregroundPackage != null && foregroundPackage != lastCheckedPackage) {
             lastCheckedPackage = foregroundPackage
+            Log.d(TAG, "Detected app: $foregroundPackage")
             
             // Check if app should be blocked
-            if (whitelistChecker.shouldBlock(foregroundPackage)) {
-                Log.d(TAG, "Blocking unauthorized app: $foregroundPackage")
+            val shouldBlock = whitelistChecker.shouldBlock(foregroundPackage)
+            Log.d(TAG, "Should block $foregroundPackage? $shouldBlock (whitelisted: ${!shouldBlock})")
+            
+            if (shouldBlock) {
+                Log.w(TAG, "🚫 BLOCKING unauthorized app: $foregroundPackage")
                 blockingActionService.blockApp(foregroundPackage)
+            } else {
+                Log.d(TAG, "✅ Allowing whitelisted app: $foregroundPackage")
             }
         }
     }
