@@ -6,8 +6,8 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Device Admin Receiver for kiosk mode
- * Provides device administrator capabilities for Lock Task Mode
+ * Device Admin Receiver for screen lock capability.
+ * Required for turning off the screen when blocking apps.
  */
 class KioskDeviceAdmin : DeviceAdminReceiver() {
     
@@ -25,13 +25,7 @@ class KioskDeviceAdmin : DeviceAdminReceiver() {
         Log.d(TAG, "Device Admin disabled")
     }
     
-    override fun onLockTaskModeEntering(context: Context, intent: Intent, pkg: String) {
-        super.onLockTaskModeEntering(context, intent, pkg)
-        Log.d(TAG, "Lock Task Mode entering: $pkg")
-    }
-    
-    override fun onLockTaskModeExiting(context: Context, intent: Intent) {
-        super.onLockTaskModeExiting(context, intent)
-        Log.d(TAG, "Lock Task Mode exiting")
+    override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
+        return "Disabling Device Admin will prevent kiosk mode from locking the screen when blocking apps."
     }
 }

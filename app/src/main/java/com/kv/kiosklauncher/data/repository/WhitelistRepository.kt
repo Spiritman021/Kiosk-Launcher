@@ -1,103 +1,113 @@
 package com.kv.kiosklauncher.data.repository
 
-import com.kv.kiosklauncher.data.database.WhitelistDao
-import com.kv.kiosklauncher.data.model.WhitelistEntry
+import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import com.kv.kiosklauncher.data.dao.WhitelistedAppDao
+import com.kv.kiosklauncher.data.model.AppInfo
+import com.kv.kiosklauncher.data.model.WhitelistedApp
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository for managing whitelisted applications
+ * Repository for managing whitelisted apps.
+ * Handles both database operations and package manager queries.
  */
 @Singleton
 class WhitelistRepository @Inject constructor(
-    private val whitelistDao: WhitelistDao
+    @ApplicationContext private val context: Context,
+    private val whitelistedAppDao: WhitelistedAppDao
 ) {
     
+    private val packageManager: PackageManager = context.packageManager
+    
     /**
-     * Get all whitelisted apps as Flow for reactive updates
+     * Get all installed apps on the device
      */
-    fun getWhitelistedApps(): Flow<List<WhitelistEntry>> {
-        return whitelistDao.getAllWhitelistedApps()
+    suspend fun getAllInstalledApps(): List<AppInfo> {
+        val whitelistedPackages = whitelistedAppDao.getAllWhitelistedPackageNames().toSet()
+        
+        return packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+            .filter { appInfo ->
+                // Filter out this app itself
+                appInfo.packageName != context.packageName &&
+                // Has a launch intent (is launchable)
+                packageManager.getLaunchIntentForPackage(appInfo.packageName) != null
+            }
+            .map { appInfo ->
+                AppInfo(
+                    packageName = appInfo.packageName,
+                    appName = packageManager.getApplicationLabel(appInfo).toString(),
+                    isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    isWhitelisted = whitelistedPackages.contains(appInfo.packageName)
+                )
+            }
+            .sortedBy { it.appName }
     }
     
     /**
-     * Get all apps (including disabled) as Flow
+     * Get all whitelisted apps
      */
-    fun getAllApps(): Flow<List<WhitelistEntry>> {
-        return whitelistDao.getAllApps()
-    }
-    
-    /**
-     * Check if an app is whitelisted
-     */
-    suspend fun isAppWhitelisted(packageName: String): Boolean {
-        return whitelistDao.isAppWhitelisted(packageName)
+    fun getWhitelistedApps(): Flow<List<WhitelistedApp>> {
+        return whitelistedAppDao.getAllWhitelistedApps()
     }
     
     /**
      * Add an app to whitelist
      */
-    suspend fun addToWhitelist(packageName: String, appName: String) {
-        val entry = WhitelistEntry(
-            packageName = packageName,
-            appName = appName,
-            addedAt = System.currentTimeMillis(),
-            isEnabled = true
+    suspend fun addToWhitelist(appInfo: AppInfo) {
+        val whitelistedApp = WhitelistedApp(
+            packageName = appInfo.packageName,
+            appName = appInfo.appName,
+            isSystemApp = appInfo.isSystemApp,
+            isAutoWhitelisted = false
         )
-        whitelistDao.insertApp(entry)
-    }
-    
-    /**
-     * Add multiple apps to whitelist
-     */
-    suspend fun addMultipleToWhitelist(apps: List<Pair<String, String>>) {
-        val entries = apps.map { (packageName, appName) ->
-            WhitelistEntry(
-                packageName = packageName,
-                appName = appName,
-                addedAt = System.currentTimeMillis(),
-                isEnabled = true
-            )
-        }
-        whitelistDao.insertApps(entries)
+        whitelistedAppDao.insertWhitelistedApp(whitelistedApp)
     }
     
     /**
      * Remove an app from whitelist
      */
     suspend fun removeFromWhitelist(packageName: String) {
-        whitelistDao.deleteAppByPackage(packageName)
+        whitelistedAppDao.deleteByPackageName(packageName)
     }
     
     /**
-     * Toggle app whitelist status
+     * Check if an app is whitelisted
      */
-    suspend fun toggleAppStatus(packageName: String) {
-        val app = whitelistDao.getApp(packageName)
-        app?.let {
-            whitelistDao.updateApp(it.copy(isEnabled = !it.isEnabled))
+    suspend fun isWhitelisted(packageName: String): Boolean {
+        return whitelistedAppDao.isAppWhitelisted(packageName)
+    }
+    
+    /**
+     * Auto-whitelist phone/dialer app
+     */
+    suspend fun autoWhitelistPhoneApp() {
+        val dialerPackages = listOf(
+            "com.android.dialer",
+            "com.android.phone",
+            "com.google.android.dialer",
+            "com.samsung.android.dialer"
+        )
+        
+        dialerPackages.forEach { packageName ->
+            try {
+                val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                val appName = packageManager.getApplicationLabel(appInfo).toString()
+                
+                val whitelistedApp = WhitelistedApp(
+                    packageName = packageName,
+                    appName = appName,
+                    isSystemApp = true,
+                    isAutoWhitelisted = true
+                )
+                whitelistedAppDao.insertWhitelistedApp(whitelistedApp)
+            } catch (e: PackageManager.NameNotFoundException) {
+                // App not installed, skip
+            }
         }
-    }
-    
-    /**
-     * Clear entire whitelist
-     */
-    suspend fun clearWhitelist() {
-        whitelistDao.clearWhitelist()
-    }
-    
-    /**
-     * Get count of whitelisted apps
-     */
-    suspend fun getWhitelistCount(): Int {
-        return whitelistDao.getWhitelistCount()
-    }
-    
-    /**
-     * Import whitelist from list
-     */
-    suspend fun importWhitelist(entries: List<WhitelistEntry>) {
-        whitelistDao.insertApps(entries)
     }
 }

@@ -64,15 +64,15 @@
             </intent-filter>
         </activity>
         
-        <!-- Admin Settings Activity -->
+        <!-- Timer Activity -->
         <activity
-            android:name=".presentation.admin.AdminSettingsActivity"
+            android:name=".presentation.timer.TimerActivity"
             android:exported="false"
             android:theme="@style/Theme.KioskLauncher" />
         
-        <!-- Original MainActivity (can be removed later) -->
+        <!-- Permission Setup Activity -->
         <activity
-            android:name=".MainActivity"
+            android:name=".presentation.permissions.PermissionSetupActivity"
             android:exported="false"
             android:theme="@style/Theme.KioskLauncher" />
         
@@ -103,9 +103,9 @@
             </intent-filter>
         </receiver>
         
-        <!-- Kiosk Service -->
+        <!-- App Monitor Service (high-frequency polling) -->
         <service
-            android:name=".service.KioskService"
+            android:name=".service.AppMonitorService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
@@ -114,40 +114,7 @@
                 android:value="kiosk_mode" />
         </service>
         
-        <!-- Continuous Monitor Service (50ms polling) -->
-        <service
-            android:name=".service.ContinuousMonitorService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="kiosk_mode" />
-        </service>
-        
-        <!-- Blocker Overlay Service (instant visual blocking) -->
-        <service
-            android:name=".service.BlockerOverlayService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="kiosk_mode" />
-        </service>
-        
-        <!-- Status Bar Blocker Service (System-wide overlay) -->
-        <service
-            android:name=".service.StatusBarBlockerService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="kiosk_mode" />
-        </service>
-        
-        <!-- Accessibility Service for robust monitoring -->
+        <!-- Accessibility Service for instant app detection -->
         <service
             android:name=".service.KioskAccessibilityService"
             android:exported="false"

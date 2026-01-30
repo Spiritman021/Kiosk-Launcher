@@ -1,126 +1,73 @@
 package com.kv.kiosklauncher.presentation.launcher
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kv.kiosklauncher.data.dao.WhitelistedAppDao
 import com.kv.kiosklauncher.data.model.AppInfo
-import com.kv.kiosklauncher.data.model.KioskConfiguration
-import com.kv.kiosklauncher.data.repository.ConfigurationRepository
-import com.kv.kiosklauncher.data.repository.WhitelistRepository
-import com.kv.kiosklauncher.service.StatusBarBlockerService
-import com.kv.kiosklauncher.util.AppManager
+import com.kv.kiosklauncher.service.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel for the launcher home screen
+ * ViewModel for LauncherActivity.
+ * Manages whitelisted apps display and session state.
  */
 @HiltViewModel
 class LauncherViewModel @Inject constructor(
-    private val whitelistRepository: WhitelistRepository,
-    private val configurationRepository: ConfigurationRepository,
-    private val appManager: AppManager
-) : ViewModel() {
+    application: Application,
+    private val whitelistedAppDao: WhitelistedAppDao,
+    private val sessionManager: SessionManager
+) : AndroidViewModel(application) {
     
-    private val _uiState = MutableStateFlow<LauncherUiState>(LauncherUiState.Loading)
-    val uiState: StateFlow<LauncherUiState> = _uiState.asStateFlow()
+    private val packageManager: PackageManager = application.packageManager
     
-    private val _configuration = MutableStateFlow(KioskConfiguration())
-    val configuration: StateFlow<KioskConfiguration> = _configuration.asStateFlow()
+    val isSessionActive = sessionManager.isSessionActive
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     
-
-    private val TAG = "LauncherViewModel"
-
-    init {
-        loadWhitelistedApps()
-        loadConfiguration()
-    }
-
-    /**
-     * Load whitelisted apps
-     */
-    private fun loadWhitelistedApps() {
-        viewModelScope.launch {
-            combine(
-                whitelistRepository.getWhitelistedApps(),
-                configurationRepository.configuration
-            ) { whitelistEntries, config ->
-                _configuration.value = config
-
-                // Get full app info for whitelisted apps
-                val apps = whitelistEntries.mapNotNull { entry ->
-                    appManager.getAppInfo(entry.packageName)
-                }
-
-                if (apps.isEmpty()) {
-                    LauncherUiState.Empty
-                } else {
-                    LauncherUiState.Success(
-                        apps = apps,
-                        gridColumns = config.gridColumns,
-                        showAppNames = config.showAppNames
+    val whitelistedApps: StateFlow<List<AppInfo>> = whitelistedAppDao
+        .getAllWhitelistedApps()
+        .map { whitelisted ->
+            whitelisted.mapNotNull { app ->
+                try {
+                    val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
+                    AppInfo(
+                        packageName = app.packageName,
+                        appName = app.appName,
+                        isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                        isWhitelisted = true
                     )
+                } catch (e: PackageManager.NameNotFoundException) {
+                    null // App not installed
                 }
-            }.collect { state ->
-                _uiState.value = state
             }
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     
-    /**
-     * Load configuration
-     */
-    private fun loadConfiguration() {
+    private val _remainingTimeText = MutableStateFlow("No active session")
+    val remainingTimeText: StateFlow<String> = _remainingTimeText.asStateFlow()
+    
+    init {
+        // Update remaining time every second
         viewModelScope.launch {
-            configurationRepository.configuration.collect { config ->
-                _configuration.value = config
+            while (true) {
+                if (isSessionActive.value) {
+                    val remainingMs = sessionManager.getRemainingTimeMs()
+                    val minutes = (remainingMs / 1000 / 60).toInt()
+                    val seconds = ((remainingMs / 1000) % 60).toInt()
+                    _remainingTimeText.value = String.format("%d:%02d remaining", minutes, seconds)
+                }
+                kotlinx.coroutines.delay(1000)
             }
         }
-    }
-    
-    /**
-     * Launch an app
-     */
-    fun launchApp(app: AppInfo) {
+        
+        // Load active session on start
         viewModelScope.launch {
-            val success = appManager.launchApp(app.packageName)
-            if (!success) {
-                _uiState.value = LauncherUiState.Error("Failed to launch app")
-            }
+            sessionManager.loadActiveSession()
         }
     }
-    
-    /**
-     * Disable kiosk mode (for emergency exit)
-     */
-    fun disableKioskMode() {
-        viewModelScope.launch {
-            configurationRepository.setKioskModeEnabled(false)
-        }
-    }
-    
-    /**
-     * Refresh apps list
-     */
-    fun refreshApps() {
-        loadWhitelistedApps()
-    }
-}
-
-/**
- * UI state for launcher screen
- */
-sealed class LauncherUiState {
-    object Loading : LauncherUiState()
-    object Empty : LauncherUiState()
-    data class Success(
-        val apps: List<AppInfo>,
-        val gridColumns: Int = 3,
-        val showAppNames: Boolean = true
-    ) : LauncherUiState()
-    data class Error(val message: String) : LauncherUiState()
 }

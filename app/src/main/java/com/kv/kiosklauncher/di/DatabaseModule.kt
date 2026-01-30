@@ -2,9 +2,8 @@ package com.kv.kiosklauncher.di
 
 import android.content.Context
 import androidx.room.Room
-import com.google.gson.Gson
+import com.kv.kiosklauncher.data.dao.*
 import com.kv.kiosklauncher.data.database.KioskDatabase
-import com.kv.kiosklauncher.data.database.WhitelistDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -13,12 +12,15 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Hilt module for providing database and data layer dependencies
+ * Hilt module for providing database-related dependencies.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
     
+    /**
+     * Provides the Room database instance
+     */
     @Provides
     @Singleton
     fun provideKioskDatabase(
@@ -29,19 +31,52 @@ object DatabaseModule {
             KioskDatabase::class.java,
             KioskDatabase.DATABASE_NAME
         )
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration() // For development; use proper migrations in production
             .build()
     }
     
+    /**
+     * Provides SessionDao
+     */
     @Provides
     @Singleton
-    fun provideWhitelistDao(database: KioskDatabase): WhitelistDao {
-        return database.whitelistDao()
+    fun provideSessionDao(database: KioskDatabase): SessionDao {
+        return database.sessionDao()
     }
     
+    /**
+     * Provides WhitelistedAppDao
+     */
     @Provides
     @Singleton
-    fun provideGson(): Gson {
-        return Gson()
+    fun provideWhitelistedAppDao(database: KioskDatabase): WhitelistedAppDao {
+        return database.whitelistedAppDao()
+    }
+    
+    /**
+     * Provides KioskSettingsDao
+     */
+    @Provides
+    @Singleton
+    fun provideKioskSettingsDao(database: KioskDatabase): KioskSettingsDao {
+        return database.kioskSettingsDao()
+    }
+    
+    /**
+     * Provides BlockLogDao
+     */
+    @Provides
+    @Singleton
+    fun provideBlockLogDao(database: KioskDatabase): BlockLogDao {
+        return database.blockLogDao()
+    }
+    
+    /**
+     * Provides AdminCredentialsDao
+     */
+    @Provides
+    @Singleton
+    fun provideAdminCredentialsDao(database: KioskDatabase): AdminCredentialsDao {
+        return database.adminCredentialsDao()
     }
 }

@@ -1,182 +1,221 @@
 package com.kv.kiosklauncher.presentation.launcher
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.activity.viewModels
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
-import com.kv.kiosklauncher.data.repository.ConfigurationRepository
-import com.kv.kiosklauncher.data.repository.WhitelistRepository
-import com.kv.kiosklauncher.presentation.theme.KioskLauncherTheme
-import com.kv.kiosklauncher.service.KioskService
-import com.kv.kiosklauncher.util.AppLaunchMonitor
-import com.kv.kiosklauncher.util.LockTaskManager
-import com.kv.kiosklauncher.util.SystemUIManager
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
+import com.kv.kiosklauncher.data.model.AppInfo
+import com.kv.kiosklauncher.presentation.timer.TimerActivity
+import com.kv.kiosklauncher.ui.theme.KioskLauncherTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 /**
- * Main launcher activity for kiosk mode
+ * Main launcher activity - shows whitelisted apps during active session.
+ * Acts as the home screen for the kiosk mode.
  */
 @AndroidEntryPoint
 class LauncherActivity : ComponentActivity() {
     
-    @Inject
-    lateinit var lockTaskManager: LockTaskManager
-    
-    @Inject
-    lateinit var systemUIManager: SystemUIManager
-    
-    @Inject
-    lateinit var appLaunchMonitor: AppLaunchMonitor
-    
-    @Inject
-    lateinit var configurationRepository: ConfigurationRepository
-    
-    @Inject
-    lateinit var whitelistRepository: WhitelistRepository
+    private val viewModel: LauncherViewModel by viewModels()
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Apply kiosk mode window flags BEFORE setting content
-        window.addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        
-        enableEdgeToEdge()
-        
         setContent {
             KioskLauncherTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    LauncherScreen()
-                }
-            }
-        }
-        
-        // Initialize kiosk mode
-        initializeKioskMode()
-    }
-    
-    override fun onResume() {
-        super.onResume()
-        
-        // Apply kiosk mode settings every time we resume
-        lifecycleScope.launch {
-            applyKioskModeSettings()
-        }
-    }
-    
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        
-        // Reapply system UI hiding when window regains focus
-        if (hasFocus) {
-            lifecycleScope.launch {
-                val config = configurationRepository.configuration.first()
-                if (config.isKioskModeEnabled) {
-                    systemUIManager.hideSystemUI(window)
-                }
+                LauncherScreen(
+                    viewModel = viewModel,
+                    onAppClick = { appInfo ->
+                        launchApp(appInfo.packageName)
+                    },
+                    onTimerClick = {
+                        startActivity(Intent(this, TimerActivity::class.java))
+                    },
+                    onSettingsClick = {
+                        // TODO: Navigate to admin settings
+                    }
+                )
             }
         }
     }
     
-    override fun onPause() {
-        super.onPause()
-        // Don't force launcher to front - let accessibility service and app monitor handle blocking
-        // This allows AdminSettingsActivity and whitelisted apps to work properly
+    private fun launchApp(packageName: String) {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                startActivity(launchIntent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
     
-    @Deprecated("Deprecated in Java")
-    @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        // Disable back button in kiosk mode
-        lifecycleScope.launch {
-            val config = configurationRepository.configuration.first()
-            if (!config.isKioskModeEnabled) {
-                super.onBackPressed()
-            }
-            // Otherwise, do nothing (back button disabled)
-        }
-    }
-    
-    /**
-     * Initialize kiosk mode features
-     */
-    private fun initializeKioskMode() {
-        lifecycleScope.launch {
-            val config = configurationRepository.configuration.first()
-            
-            if (config.isKioskModeEnabled) {
-                // Start kiosk service
-                val serviceIntent = Intent(this@LauncherActivity, KioskService::class.java)
-                startForegroundService(serviceIntent)
-                
-                // Start app launch monitoring
-                val whitelistedPackages = whitelistRepository.getAllApps().first()
-                    .filter { it.isEnabled }
-                    .map { it.packageName }
-                    .toSet()
-                
-                if (appLaunchMonitor.hasUsageStatsPermission()) {
-                    appLaunchMonitor.startMonitoring(whitelistedPackages)
-                }
-            }
-        }
-    }
-    
-    /**
-     * Apply kiosk mode settings
-     */
-    private suspend fun applyKioskModeSettings() {
-        val config = configurationRepository.configuration.first()
-        
-        if (!config.isKioskModeEnabled) {
-            // Remove kiosk restrictions if disabled
-            systemUIManager.removeKioskMode(window)
-            return
-        }
-        
-        // Try Lock Task Mode first (Android 5.0+)
-        if (config.useLockTaskMode && lockTaskManager.isLockTaskModeSupported()) {
-            if (lockTaskManager.isDeviceOwner()) {
-                lockTaskManager.startLockTask(this)
-                // Lock Task Mode handles status bar blocking
-                systemUIManager.hideSystemUI(window)
-                systemUIManager.keepScreenOn(window)
-            } else {
-                // No device owner - use system UI hiding only
-                // StatusBarBlockerService handles the overlay
-                systemUIManager.hideSystemUI(window)
-                systemUIManager.disableStatusBarExpansion(window)
-                systemUIManager.keepScreenOn(window)
-            }
+        // Disable back button during active session
+        if (viewModel.isSessionActive.value) {
+            // Do nothing - prevent exit
         } else {
-            // Fallback to system UI hiding
-            // StatusBarBlockerService handles the overlay
-            systemUIManager.hideSystemUI(window)
-            systemUIManager.disableStatusBarExpansion(window)
-            systemUIManager.keepScreenOn(window)
+            super.onBackPressed()
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LauncherScreen(
+    viewModel: LauncherViewModel,
+    onAppClick: (AppInfo) -> Unit,
+    onTimerClick: () -> Unit,
+    onSettingsClick: () -> Unit
+) {
+    val whitelistedApps by viewModel.whitelistedApps.collectAsState()
+    val isSessionActive by viewModel.isSessionActive.collectAsState()
+    val remainingTime by viewModel.remainingTimeText.collectAsState()
     
-    override fun onDestroy() {
-        super.onDestroy()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    if (isSessionActive) {
+                        Column {
+                            Text("Kiosk Mode Active")
+                            Text(
+                                text = remainingTime,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    } else {
+                        Text("Kiosk Launcher")
+                    }
+                },
+                actions = {
+                    if (!isSessionActive) {
+                        IconButton(onClick = onTimerClick) {
+                            Icon(Icons.Default.Timer, "Start Session")
+                        }
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Default.Settings, "Settings")
+                        }
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        if (whitelistedApps.isEmpty()) {
+            EmptyState(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                onTimerClick = onTimerClick
+            )
+        } else {
+            AppGrid(
+                apps = whitelistedApps,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                onAppClick = onAppClick
+            )
+        }
+    }
+}
+
+@Composable
+fun AppGrid(
+    apps: List<AppInfo>,
+    modifier: Modifier = Modifier,
+    onAppClick: (AppInfo) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(4),
+        modifier = modifier,
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(apps) { app ->
+            AppItem(app = app, onClick = { onAppClick(app) })
+        }
+    }
+}
+
+@Composable
+fun AppItem(
+    app: AppInfo,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // App icon would go here
+        Surface(
+            modifier = Modifier.size(64.dp),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            // Placeholder for app icon
+        }
         
-        // Stop monitoring when activity is destroyed
-        appLaunchMonitor.stopMonitoring()
+        Spacer(modifier = Modifier.height(8.dp))
         
-        // StatusBarBlockerService handles overlay cleanup
+        Text(
+            text = app.appName,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun EmptyState(
+    modifier: Modifier = Modifier,
+    onTimerClick: () -> Unit
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "No whitelisted apps",
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Add apps to whitelist in settings",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onTimerClick) {
+            Icon(Icons.Default.Timer, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Start Kiosk Session")
+        }
     }
 }
