@@ -58,12 +58,16 @@ class PermissionHelper(private val context: Context) {
      * Check if Accessibility Service is enabled
      */
     fun isAccessibilityServiceEnabled(): Boolean {
-        val serviceName = "${context.packageName}/.service.KioskAccessibilityService"
+        // Try multiple formats to ensure compatibility
+        val serviceName1 = "${context.packageName}/.service.KioskAccessibilityService"
+        val serviceName2 = "${context.packageName}/com.kv.kiosklauncher.service.KioskAccessibilityService"
+        
         val enabledServices = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        )
-        return enabledServices?.contains(serviceName) == true
+        ) ?: return false
+        
+        return enabledServices.contains(serviceName1) || enabledServices.contains(serviceName2)
     }
     
     /**
