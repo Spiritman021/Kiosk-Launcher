@@ -25,7 +25,34 @@ class SessionManager @Inject constructor(
     val isSessionActive: StateFlow<Boolean> = _isSessionActive.asStateFlow()
     
     /**
-     * Start a new kiosk session with the specified duration
+     * Start a new indefinite kiosk session (no time limit)
+     */
+    suspend fun startIndefiniteSession(): Session {
+        // Deactivate any existing sessions
+        sessionDao.deactivateAllSessions()
+        
+        val now = System.currentTimeMillis()
+        
+        val session = Session(
+            startTime = now,
+            durationMinutes = 0,
+            endTime = Long.MAX_VALUE,
+            isActive = true,
+            isIndefinite = true,
+            createdAt = now
+        )
+        
+        val sessionId = sessionDao.insertSession(session)
+        val createdSession = session.copy(id = sessionId)
+        
+        _currentSession.value = createdSession
+        _isSessionActive.value = true
+        
+        return createdSession
+    }
+    
+    /**
+     * Start a new kiosk session with the specified duration (for backward compatibility)
      */
     suspend fun startSession(durationMinutes: Int): Session {
         // Deactivate any existing sessions
@@ -39,6 +66,7 @@ class SessionManager @Inject constructor(
             durationMinutes = durationMinutes,
             endTime = endTime,
             isActive = true,
+            isIndefinite = false,
             createdAt = now
         )
         

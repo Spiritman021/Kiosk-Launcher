@@ -70,6 +70,12 @@
             android:exported="false"
             android:theme="@style/Theme.KioskLauncher" />
         
+        <!-- Admin Settings Activity -->
+        <activity
+            android:name=".presentation.admin.AdminSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.KioskLauncher" />
+        
         <!-- Permission Setup Activity -->
         <activity
             android:name=".presentation.permissions.PermissionSetupActivity"

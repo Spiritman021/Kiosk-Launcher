@@ -18,7 +18,7 @@ import com.kv.kiosklauncher.data.model.*
         BlockLog::class,
         AdminCredentials::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

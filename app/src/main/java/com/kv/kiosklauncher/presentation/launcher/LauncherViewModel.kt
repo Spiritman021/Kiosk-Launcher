@@ -52,14 +52,31 @@ class LauncherViewModel @Inject constructor(
     val remainingTimeText: StateFlow<String> = _remainingTimeText.asStateFlow()
     
     init {
-        // Update remaining time every second
+        // Update time display every second
         viewModelScope.launch {
             while (true) {
                 if (isSessionActive.value) {
-                    val remainingMs = sessionManager.getRemainingTimeMs()
-                    val minutes = (remainingMs / 1000 / 60).toInt()
-                    val seconds = ((remainingMs / 1000) % 60).toInt()
-                    _remainingTimeText.value = String.format("%d:%02d remaining", minutes, seconds)
+                    val session = sessionManager.currentSession.value
+                    if (session != null) {
+                        if (session.isIndefinite) {
+                            // Show elapsed time for indefinite sessions
+                            val elapsedMs = session.getElapsedTimeMs()
+                            val hours = (elapsedMs / 1000 / 60 / 60).toInt()
+                            val minutes = ((elapsedMs / 1000 / 60) % 60).toInt()
+                            val seconds = ((elapsedMs / 1000) % 60).toInt()
+                            _remainingTimeText.value = if (hours > 0) {
+                                String.format("Active: %d:%02d:%02d", hours, minutes, seconds)
+                            } else {
+                                String.format("Active: %d:%02d", minutes, seconds)
+                            }
+                        } else {
+                            // Show remaining time for timed sessions
+                            val remainingMs = sessionManager.getRemainingTimeMs()
+                            val minutes = (remainingMs / 1000 / 60).toInt()
+                            val seconds = ((remainingMs / 1000) % 60).toInt()
+                            _remainingTimeText.value = String.format("%d:%02d remaining", minutes, seconds)
+                        }
+                    }
                 }
                 kotlinx.coroutines.delay(1000)
             }

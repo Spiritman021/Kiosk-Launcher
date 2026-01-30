@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kv.kiosklauncher.presentation.permissions.PermissionSetupActivity
 import com.kv.kiosklauncher.service.AppMonitorService
@@ -36,9 +37,9 @@ class TimerActivity : ComponentActivity() {
             KioskLauncherTheme {
                 TimerScreen(
                     viewModel = viewModel,
-                    onStartSession = { minutes ->
+                    onStartSession = {
                         if (viewModel.hasAllPermissions()) {
-                            viewModel.startSession(minutes)
+                            viewModel.startIndefiniteSession()
                             startMonitoringService()
                             finish()
                         } else {
@@ -75,19 +76,17 @@ class TimerActivity : ComponentActivity() {
 @Composable
 fun TimerScreen(
     viewModel: TimerViewModel,
-    onStartSession: (Int) -> Unit,
+    onStartSession: () -> Unit,
     onStopSession: () -> Unit
 ) {
     val isSessionActive by viewModel.isSessionActive.collectAsState()
     val whitelistCount by viewModel.whitelistCount.collectAsState()
     val hasAllPermissions by viewModel.hasAllPermissions.collectAsState()
     
-    var durationMinutes by remember { mutableStateOf("30") }
-    
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Kiosk Session") }
+                title = { Text("Kiosk Mode") }
             )
         }
     ) { padding ->
@@ -105,16 +104,11 @@ fun TimerScreen(
                     onStopSession = onStopSession
                 )
             } else {
-                // No active session - show timer setup
-                TimerSetupView(
-                    durationMinutes = durationMinutes,
-                    onDurationChange = { durationMinutes = it },
+                // No active session - show start button
+                KioskSetupView(
                     whitelistCount = whitelistCount,
                     hasAllPermissions = hasAllPermissions,
-                    onStartSession = {
-                        val minutes = durationMinutes.toIntOrNull() ?: 30
-                        onStartSession(minutes)
-                    }
+                    onStartSession = onStartSession
                 )
             }
         }
@@ -122,9 +116,7 @@ fun TimerScreen(
 }
 
 @Composable
-fun TimerSetupView(
-    durationMinutes: String,
-    onDurationChange: (String) -> Unit,
+fun KioskSetupView(
     whitelistCount: Int,
     hasAllPermissions: Boolean,
     onStartSession: () -> Unit
@@ -137,22 +129,20 @@ fun TimerSetupView(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Set Session Duration",
+                text = "Kiosk Mode",
                 style = MaterialTheme.typography.headlineSmall
             )
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
-            OutlinedTextField(
-                value = durationMinutes,
-                onValueChange = onDurationChange,
-                label = { Text("Duration (minutes)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+            Text(
+                text = "Start kiosk mode to restrict access to whitelisted apps only",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
             Text(
                 text = "$whitelistCount apps whitelisted",
@@ -177,7 +167,7 @@ fun TimerSetupView(
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Start Kiosk Session")
+                Text("Start Kiosk Mode")
             }
         }
     }

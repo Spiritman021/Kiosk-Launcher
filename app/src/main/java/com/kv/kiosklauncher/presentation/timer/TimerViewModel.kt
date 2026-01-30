@@ -39,6 +39,16 @@ class TimerViewModel @Inject constructor(
         checkPermissions()
     }
     
+    fun startIndefiniteSession() {
+        viewModelScope.launch {
+            // Refresh whitelist cache
+            whitelistChecker.refreshCache()
+            
+            // Start indefinite session
+            sessionManager.startIndefiniteSession()
+        }
+    }
+    
     fun startSession(durationMinutes: Int) {
         viewModelScope.launch {
             // Refresh whitelist cache

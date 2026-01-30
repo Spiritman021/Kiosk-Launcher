@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.kv.kiosklauncher.data.model.AppInfo
+import com.kv.kiosklauncher.presentation.admin.AdminSettingsActivity
 import com.kv.kiosklauncher.presentation.timer.TimerActivity
 import com.kv.kiosklauncher.ui.theme.KioskLauncherTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -52,7 +53,7 @@ class LauncherActivity : ComponentActivity() {
                         startActivity(Intent(this, TimerActivity::class.java))
                     },
                     onSettingsClick = {
-                        // TODO: Navigate to admin settings
+                        startActivity(Intent(this, AdminSettingsActivity::class.java))
                     }
                 )
             }
@@ -113,7 +114,7 @@ fun LauncherScreen(
                         IconButton(onClick = onTimerClick) {
                             Icon(Icons.Default.Timer, "Start Session")
                         }
-                        IconButton(onClick = onSettingsClick) {
+                        IconButton(onClick = onSettingsClick) { // Kept onSettingsClick lambda
                             Icon(Icons.Default.Settings, "Settings")
                         }
                     }

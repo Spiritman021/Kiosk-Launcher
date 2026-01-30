@@ -29,9 +29,9 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context,
             KioskDatabase::class.java,
-            KioskDatabase.DATABASE_NAME
+            "kiosk_launcher.db"
         )
-            .fallbackToDestructiveMigration() // For development; use proper migrations in production
+            .fallbackToDestructiveMigration() // Allow destructive migration for development
             .build()
     }
     
